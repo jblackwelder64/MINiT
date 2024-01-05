@@ -87,11 +87,16 @@ def get_dataset_JB(data_dir, augment=True):
         os.path.join(data_dir, 'IXI.xls')).drop_duplicates(subset='IXI_ID').set_index('IXI_ID')['SEX_ID (1=m, 2=f)']
 
     images = []
-    labels = {}
+    labels = []
+    valid_IDs = []
     for MRI_filename in os.listdir(os.path.join(data_dir, 'IXI-T1')):
-        images.append(MRI_filename)
-        labels[int(MRI_filename[3:6])] = int(labels_pd[int(MRI_filename[3:6])])
-
+        print(int(MRI_filename[3:6]))
+        MRI_ID = int(MRI_filename[3:6])
+        if MRI_ID in labels_pd.keys():
+            images.append(MRI_filename)
+            valid_IDs.append(MRI_ID)
+            labels.append(labels_pd[MRI_ID])
+    labels_pd = labels_pd[labels_pd.index.isin(valid_IDs)]
     # Define transforms
     if augment:
         train_transforms = Compose([ScaleIntensity(), EnsureChannelFirst(), Resize((64, 64, 64)), RandRotate90()])
@@ -102,21 +107,35 @@ def get_dataset_JB(data_dir, augment=True):
         val_transforms = Compose([ScaleIntensity(), EnsureChannelFirst(), Resize((64, 64, 64))])
 
     # Define nifti dataset, data loader
-    check_ds = ImageDataset(image_files=images, labels=labels, transform=train_transforms)
-    check_ds.list_IDs = [int(f_name[3:6]) for f_name in check_ds.image_files]
+    check_ds = ImageDataset(image_files=images.copy(), labels=labels, transform=train_transforms)
+    check_ds.list_IDs = {}
+    check_ds.data_dir = data_dir
+    check_ds.labels_pd = labels_pd
+    for i in range(len(check_ds.image_files)):
+        check_ds.list_IDs[i] = int(check_ds.image_files[i][3:6])
+        check_ds.image_files[i] = os.path.join(data_dir, 'IXI-T1', check_ds.image_files[i])
+        
     # check_loader = DataLoader(check_ds, batch_size=3, num_workers=2, pin_memory=pin_memory)
 
     # im, label = monai.utils.misc.first(check_loader)
     # print(type(im), im.shape, label, label.shape)
 
     # create a training data loader
-    train_ds = ImageDataset(image_files=images[:10], labels=labels[:10], transform=train_transforms)
-    train_ds.list_IDs = [int(f_name[3:6]) for f_name in train_ds.image_files]
+    train_ds = ImageDataset(image_files=images[:10].copy(), labels=labels[:10], transform=train_transforms)
+    train_ds.list_IDs = {}
+    train_ds.data_dir = data_dir
+    for i in range(len(train_ds.image_files)):
+        train_ds.list_IDs[i] = int(train_ds.image_files[i][3:6])
+        train_ds.image_files[i] = os.path.join(data_dir, 'IXI-T1', train_ds.image_files[i])
     # train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=2, pin_memory=pin_memory)
 
     # create a validation data loader
-    val_ds = ImageDataset(image_files=images[-10:], labels=labels[-10:], transform=val_transforms)
-    val_ds.list_IDs = [int(f_name[3:6]) for f_name in val_ds.image_files]
+    val_ds = ImageDataset(image_files=images[-10:].copy(), labels=labels[-10:], transform=val_transforms)
+    val_ds.list_IDs = {}
+    val_ds.data_dir = data_dir
+    for i in range(len(val_ds.image_files)):
+        val_ds.list_IDs[i] = int(val_ds.image_files[i][3:6])
+        val_ds.image_files[i] = os.path.join(data_dir, 'IXI-T1', val_ds.image_files[i])
     # val_loader = DataLoader(val_ds, batch_size=2, num_workers=2, pin_memory=pin_memory)
 
     return check_ds, train_ds, val_ds

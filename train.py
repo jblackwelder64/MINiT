@@ -184,6 +184,8 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
     last_time = time()
     arguments = dict(locals(), **kwargs)
 
+    print('STARTED TRAINING!!!')
+
     reproducibility(seed=1)
 
     cur_rank = comm.get_local_rank()
@@ -220,7 +222,7 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
     positive = 0 
     negative = 0 
     for i in trainset_augment.list_IDs:
-        label = trainset_augment.labels[trainset_augment.list_IDs[i]]
+        label = trainset_augment.labels_pd[trainset_augment.list_IDs[i]]
         if label == 1:
             positive += 1
         else:
@@ -229,7 +231,7 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
     # Construct weights for weighted random sampler.
     weights = []
     for i in trainset_augment.list_IDs:
-        label = trainset_augment.labels[trainset_augment.list_IDs[i]]
+        label = trainset_augment.labels_pd[trainset_augment.list_IDs[i]]
         weights.append(1.0/positive if label == 1 else 1.0/negative)
     
     sampler = DistributedSamplerWrapper(sampler=WeightedRandomSampler(weights, len(weights)), num_replicas=comm.get_world_size(), rank=comm.get_local_rank(), shuffle=False)
