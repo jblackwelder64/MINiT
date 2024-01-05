@@ -61,7 +61,7 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
         
     # Loading pretrained model.
     if comm.is_main_process() and len(argv) >= 5:
-        checkpoint = torch.load(f"{ckpt_folder}/{argv[4]}.pt", map_location='cpu')
+        checkpoint = torch.load(f"{ckpt_folder}/{argv[4]}.pt", map_location=cur_rank)
         state = checkpoint['model_state_dict']
         net.load_state_dict(state, strict=True)
 
@@ -187,7 +187,99 @@ def main():
 
 if __name__ == '__main__':
     training_start_time = time()
-    launch(
+    # launch(
+    #     main,
+    #     num_gpus_per_machine=NUM_GPUS_PER_MACHINE,
+    #     num_machines=1,
+    #     machine_rank=0,
+    #     dist_url='auto',
+    #     args=()
+    # )
+
+    # Copyright (c) Facebook, Inc. and its affiliates.
+    import logging
+    from datetime import timedelta
+    import torch
+    import torch.distributed as dist
+    import torch.multiprocessing as mp
+
+    from detectron2.utils import comm
+
+    __all__ = ["DEFAULT_TIMEOUT", "launch"]
+
+    DEFAULT_TIMEOUT = timedelta(minutes=30)
+
+
+    def _find_free_port():
+        import socket
+
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        # Binding to port 0 will cause the OS to find an available port for us
+        sock.bind(("", 0))
+        port = sock.getsockname()[1]
+        sock.close()
+        # NOTE: there is still a chance the port could be taken by other processes.
+        return port
+
+
+    def launch_2(
+        main_func,
+        num_gpus_per_machine,
+        num_machines=1,
+        machine_rank=0,
+        dist_url=None,
+        args=(),
+        timeout=DEFAULT_TIMEOUT,
+    ):
+        """
+        Launch multi-gpu or distributed training.
+        This function must be called on all machines involved in the training.
+        It will spawn child processes (defined by ``num_gpus_per_machine``) on each machine.
+
+        Args:
+            main_func: a function that will be called by `main_func(*args)`
+            num_gpus_per_machine (int): number of GPUs per machine
+            num_machines (int): the total number of machines
+            machine_rank (int): the rank of this machine
+            dist_url (str): url to connect to for distributed jobs, including protocol
+                        e.g. "tcp://127.0.0.1:8686".
+                        Can be set to "auto" to automatically select a free port on localhost
+            timeout (timedelta): timeout of the distributed workers
+            args (tuple): arguments passed to main_func
+        """
+        world_size = num_machines * num_gpus_per_machine
+        if world_size >= 1:
+            # https://github.com/pytorch/pytorch/pull/14391
+            # TODO prctl in spawned processes
+
+            if dist_url == "auto":
+                assert num_machines == 1, "dist_url=auto not supported in multi-machine jobs."
+                port = _find_free_port()
+                dist_url = f"tcp://127.0.0.1:{port}"
+            if num_machines > 1 and dist_url.startswith("file://"):
+                logger = logging.getLogger(__name__)
+                logger.warning(
+                    "file:// is not a reliable init_method in multi-machine jobs. Prefer tcp://"
+                )
+
+            mp.spawn(
+                _distributed_worker,
+                nprocs=num_gpus_per_machine,
+                args=(
+                    main_func,
+                    world_size,
+                    num_gpus_per_machine,
+                    machine_rank,
+                    dist_url,
+                    args,
+                    timeout,
+                ),
+                daemon=False,
+            )
+        else:
+            main_func(*args)
+
+    launch_2(
         main,
         num_gpus_per_machine=NUM_GPUS_PER_MACHINE,
         num_machines=1,
@@ -195,4 +287,8 @@ if __name__ == '__main__':
         dist_url='auto',
         args=()
     )
+
+
+
+
     print(f"==> Finished Training after {(time() - training_start_time)/60} minutes.")
