@@ -83,12 +83,14 @@ Returns:
 def get_dataset_JB(data_dir, augment=True):
 
     # Loading MRI filenames and labels into lists
-    labels = pd.read_excel(
+    labels_pd = pd.read_excel(
         os.path.join(data_dir, 'IXI.xls')).drop_duplicates(subset='IXI_ID').set_index('IXI_ID')['SEX_ID (1=m, 2=f)']
 
     images = []
+    labels = {}
     for MRI_filename in os.listdir(os.path.join(data_dir, 'IXI-T1')):
         images.append(MRI_filename)
+        labels[int(MRI_filename[3:6])] = labels_pd[int(MRI_filename[3:6])]
 
     # Define transforms
     if augment:
