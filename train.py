@@ -203,7 +203,7 @@ if __name__ == '__main__':
     import torch.distributed as dist
     import torch.multiprocessing as mp
 
-    from detectron2.utils import comm
+    # from detectron2.utils import comm
 
     __all__ = ["DEFAULT_TIMEOUT", "launch"]
 
