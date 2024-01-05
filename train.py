@@ -61,7 +61,7 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
         
     # Loading pretrained model.
     if comm.is_main_process() and len(argv) >= 5:
-        checkpoint = torch.load(f"./checkpoints/{ckpt_folder}/{argv[4]}.pt", map_location=cur_rank)
+        checkpoint = torch.load(f"{ckpt_folder}/{argv[4]}.pt", map_location=cur_rank)
         state = checkpoint['model_state_dict']
         net.load_state_dict(state, strict=True)
 
