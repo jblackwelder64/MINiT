@@ -90,7 +90,7 @@ def get_dataset_JB(data_dir, augment=True):
     labels = {}
     for MRI_filename in os.listdir(os.path.join(data_dir, 'IXI-T1')):
         images.append(MRI_filename)
-        labels[int(MRI_filename[3:6])] = labels_pd[int(MRI_filename[3:6])]
+        labels[int(MRI_filename[3:6])] = int(labels_pd[int(MRI_filename[3:6])])
 
     # Define transforms
     if augment:
