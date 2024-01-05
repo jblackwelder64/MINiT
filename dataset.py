@@ -5,6 +5,19 @@ import pickle
 import random
 from collections import defaultdict
 import torchvision.transforms as transforms
+import pandas as pd
+
+import monai
+from monai.apps import download_and_extract
+from monai.data import DataLoader, ImageDataset
+from monai.transforms import (
+    EnsureChannelFirst,
+    Compose,
+    RandRotate90,
+    Resize,
+    ScaleIntensity,
+)
+import torch
 
 data_dir = '.'
 fold_divisions = [.8, .9, 1]
@@ -66,6 +79,53 @@ Returns:
     test sets – since we combined two datasets (ABCD and NCANDA) in our study, we extracted the 
     dataset-specific val and test sets for metric computation as well. 
 """
+
+def get_dataset_JB(data_dir, augment=True):
+
+    # Loading MRI filenames and labels into lists
+    labels = pd.read_excel(
+        os.path.join(data_dir, 'IXI.xls')).drop_duplicates(subset='IXI_ID').set_index('IXI_ID')['SEX_ID (1=m, 2=f)']
+
+    images = []
+    for MRI_filename in os.listdir(os.path.join(data_dir, 'IXI-T1')):
+        images.append(MRI_filename)
+
+    # Define transforms
+    if augment:
+        train_transforms = Compose([ScaleIntensity(), EnsureChannelFirst(), Resize((64, 64, 64)), RandRotate90()])
+        val_transforms = Compose([ScaleIntensity(), EnsureChannelFirst(), Resize((64, 64, 64))])
+
+    else:
+        train_transforms = Compose([ScaleIntensity(), EnsureChannelFirst(), Resize((64, 64, 64))])
+        val_transforms = Compose([ScaleIntensity(), EnsureChannelFirst(), Resize((64, 64, 64))])
+
+    # Define nifti dataset, data loader
+    check_ds = ImageDataset(image_files=images, labels=labels, transform=train_transforms)
+    check_ds.list_IDs = [int(f_name[3:6]) for f_name in check_ds.image_files]
+    # check_loader = DataLoader(check_ds, batch_size=3, num_workers=2, pin_memory=pin_memory)
+
+    # im, label = monai.utils.misc.first(check_loader)
+    # print(type(im), im.shape, label, label.shape)
+
+    # create a training data loader
+    train_ds = ImageDataset(image_files=images[:10], labels=labels[:10], transform=train_transforms)
+    train_ds.list_IDs = [int(f_name[3:6]) for f_name in train_ds.image_files]
+    # train_loader = DataLoader(train_ds, batch_size=2, shuffle=True, num_workers=2, pin_memory=pin_memory)
+
+    # create a validation data loader
+    val_ds = ImageDataset(image_files=images[-10:], labels=labels[-10:], transform=val_transforms)
+    val_ds.list_IDs = [int(f_name[3:6]) for f_name in val_ds.image_files]
+    # val_loader = DataLoader(val_ds, batch_size=2, num_workers=2, pin_memory=pin_memory)
+
+    return check_ds, train_ds, val_ds
+
+    
+
+
+
+
+
+
 def get_dataset(sources, task, data_dir, augment=False):
     task = task[0]
 

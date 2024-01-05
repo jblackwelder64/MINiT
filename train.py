@@ -73,7 +73,7 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
     scheduler_warmup = GradualWarmupScheduler(optimizer.base_optimizer, multiplier=multiplier, total_epoch=warmup_epochs, after_scheduler=cosine)
 
     # Due to dataset access limitations, you would need to implement get_dataset yourself to return an MRIDataset object.
-    trainset_augment = dataset.get_dataset(datasets, [TASK], DATA_DIR, augment=True)[1]
+    trainset_augment = dataset.get_dataset_JB(DATA_DIR, augment=True)[0]
     
     if comm.is_main_process():
         print('Number of examples in each fold')
@@ -84,7 +84,7 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
     negative = 0 
     for i in trainset_augment.list_IDs:
         label = trainset_augment.labels[trainset_augment.list_IDs[i]]
-        if label[TASK] == 1:
+        if label == 1:
             positive += 1
         else:
             negative += 1
@@ -92,7 +92,7 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
     # Construct weights for weighted random sampler.
     weights = []
     for i in trainset_augment.list_IDs:
-        label = trainset_augment.labels[trainset_augment.list_IDs[i]][TASK]
+        label = trainset_augment.labels[trainset_augment.list_IDs[i]]
         weights.append(1.0/positive if label == 1 else 1.0/negative)
     
     sampler = DistributedSamplerWrapper(sampler=WeightedRandomSampler(weights, len(weights)), num_replicas=comm.get_world_size(), rank=comm.get_local_rank(), shuffle=False)
