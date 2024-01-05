@@ -4,7 +4,7 @@ from minit import MINiT
 # default hyperparameters
 def default():
     hyperparameters = {
-        "gpus": 8,
+        "gpus": 1,
         "dim": 256,
         "heads": 8,
         "depth": 6,
@@ -64,10 +64,10 @@ def nit_hyperparameters():
 def minit_hyperparameters():
     hyperparameters = default()
     hyperparameters["model"] = MINiT
-    hyperparameters["dimension"] = 512
+    hyperparameters["dimension"] = 256  # originally 512
     hyperparameters["cutmix"] = 0.36
     hyperparameters["mixup"] = 0.149
-    hyperparameters["heads"] = 8
+    hyperparameters["heads"] = 4  # originally 8
     hyperparameters["dropout"] = 0.07
     hyperparameters["emb_dropout"] = 0.016
     hyperparameters["weight_decay"] = 0.125
@@ -81,4 +81,3 @@ def minit_hyperparameters():
     hyperparameters["distillation"] = True
     hyperparameters["batch_size"] = 24 * hyperparameters["gpus"]
     return hyperparameters
-
