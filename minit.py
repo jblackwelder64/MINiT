@@ -227,11 +227,19 @@ if __name__ == '__main__':
         patch_size = 4,
         num_classes = 2,
         channels = 1,
-        dim = 512,
+        dim = 256, # originally 512
         depth = 6,
-        heads = 8,
+        heads = 4, # originally 8
         mlp_dim = 309
     )
 
-    test = torch.ones(2, 1, 64, 64, 64)
+    device = torch.device("cuda")
+    net.to(device)
+
+    checkpoint = torch.load('./minit.pt', map_location=device)
+    state = checkpoint['model_state_dict']
+    net.load_state_dict(state, strict=True)
+
+    test = torch.ones(2, 1, 64, 64, 64).to(device)
     preds = net(test)
+    print(preds)
