@@ -22,8 +22,8 @@ def rand_bbox(size, lam):
     W = size[2]
     H = size[3]
     cut_rat = np.sqrt(1. - lam)
-    cut_w = np.int(W * cut_rat)
-    cut_h = np.int(H * cut_rat)
+    cut_w = int(W * cut_rat)
+    cut_h = int(H * cut_rat)
 
     # uniform
     cx = np.random.randint(W)
@@ -53,4 +53,15 @@ def cutmix_data(input, target, alpha=1.0, use_cuda=True):
 
 # This is criterion for both mixup and cutmix
 def mix_criterion(criterion, pred, y_a, y_b, lam):
+    lam = float(lam)
+    # print('pred: ', pred)
+    # print('y_a: ', y_a)
+    # print('y_b: ', y_b)
+    # print('lam: ', lam)
+    # print('TYPE: ',type(lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)))
+    # print('LEFT TYPE: ', type(lam * criterion(pred, y_a)))
+    # print('RIGHT TYPE: ', type((1 - lam) * criterion(pred, y_b)))
+    # print('CRITERION: ', criterion)
+    # print('criterion(pred, y_a): ', criterion(pred, y_a))
+    # print('TYPE LAM: ', type(lam))
     return lam * criterion(pred, y_a) + (1 - lam) * criterion(pred, y_b)
