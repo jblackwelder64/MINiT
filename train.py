@@ -18,6 +18,8 @@ from detectron2_launch import launch
 from distributed_sampler_wrapper import DistributedSamplerWrapper
 from runtime_augmentations import cutmix_data, mixup_data, mix_criterion
 
+import minit
+
 EPOCH = 101
 DEBUG = True
 MODEL_TYPE = argv[1].lower()
@@ -26,6 +28,15 @@ DATA_DIR = '.' if len(argv) <= 2 else argv[2]
 CKPT_DIR = '.' if len(argv) <= 3 else argv[3]
 XLS_PATH = '/home/jwb2168/RANN_scores_demographics_final.xls'
 NUM_GPUS_PER_MACHINE = 1
+FINETUNE = True
+TRAINABLE_PARAMS = [
+    'vit.transformer.layers.5.0.fn.norm.weight', 'vit.transformer.layers.5.0.fn.norm.bias', 
+    'vit.transformer.layers.5.0.fn.fn.to_qkv.weight', 'vit.transformer.layers.5.0.fn.fn.to_out.0.weight', 
+    'vit.transformer.layers.5.0.fn.fn.to_out.0.bias', 'vit.transformer.layers.5.1.fn.norm.weight', 
+    'vit.transformer.layers.5.1.fn.norm.bias', 'vit.transformer.layers.5.1.fn.fn.net.0.weight',
+     'vit.transformer.layers.5.1.fn.fn.net.0.bias', 'vit.transformer.layers.5.1.fn.fn.net.3.weight', 
+     'vit.transformer.layers.5.1.fn.fn.net.3.bias', 'vit.mlp_head.0.weight', 'vit.mlp_head.0.bias', 
+     'vit.mlp_head.1.weight', 'vit.mlp_head.1.bias', 'linear.weight', 'linear.bias']
 
 hyperparameter_fn = getattr(hyperparameters, f"{MODEL_TYPE}_hyperparameters")
 model_hyperparameters = hyperparameter_fn()
@@ -188,6 +199,7 @@ def validate(loader, model, criterion, amp_enabled):
     running_loss = 0.0
     model.eval()
     loss = 0
+    denom = 0
     with torch.no_grad():
         for i, (inputs, labels) in enumerate(loader):
             inputs = inputs.squeeze(1)
@@ -199,8 +211,9 @@ def validate(loader, model, criterion, amp_enabled):
                 outputs = model(inputs.float())                
                 labels = labels.squeeze(1).long()
                 loss+=criterion(outputs, labels)
-    print('validation loss: ', loss/(loader.__len__()))
-    print('validation dataset size == ', loader.__len__())
+            denom+=len(labels)
+    print('validation loss: ', loss/denom)
+    print('validation dataset size == ', denom)
 
 
 
@@ -225,6 +238,17 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
         checkpoint = torch.load(f"{ckpt_folder}/{argv[4]}.pt") #, map_location='cur_rank')
         state = checkpoint['model_state_dict']
         net.load_state_dict(state, strict=True)
+
+    
+    # Freezing all layers not contained in TRAINABLE_PARAMS if finetuneing
+    if FINETUNE:
+        for name, param in net.named_parameters():
+            if name in TRAINABLE_PARAMS:
+                print('Will optimize layer: ', name)
+                param.requires_grad = True
+            else:
+                print('Will not optimize layer: ', name)
+                param.requires_grad = False
 
     net = DDP(net, device_ids=[cur_rank], broadcast_buffers=False, find_unused_parameters=True)
     
@@ -360,7 +384,7 @@ def train(model, load_pretrained, datasets, lr, alpha, warmup_epochs, multiplier
                     'epoch': epoch,
                     'model_state_dict': net.module.state_dict(),
                     'optimizer_state_dict': optimizer.state_dict(),
-                    }, f"{ckpt_folder}/ckpt_main_{epoch}_v2.pt")
+                    }, f"{ckpt_folder}/ckpt_main_{epoch}_v3.pt")
     print(f"Rank {comm.get_local_rank()} has finished the last Epoch ({epoch}) after {(time() - last_time)/60} minutes.", flush=True)
 
 def main():
